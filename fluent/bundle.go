@@ -188,18 +188,43 @@ func assembleContexts(options ...*FormatContext) (map[string]Value, map[string]F
 	return variables, functions
 }
 
-// FormatMessage formats the message with the given key.
+// FormatMessage formats the value of the message with the given key.
 // To pass variables or functions, pass contexts created using WithVariable, WithVariables, WithFunction or WithFunctions.
 // Besides the formatted message, this method returns the errors the resolver stumbled upon during resolving specific values
-// and an optional error if there is no message with the given key.
+// and an optional error if there is no message with the given key or if it has no value of its own.
 // If the resolver returns errors it does not automatically mean that the whole message could not be resolved.
 // It may be just incomplete.
+// A message that declares only attributes has no value; use FormatMessageAttribute to format one of those.
 func (bundle *Bundle) FormatMessage(key string, contexts ...*FormatContext) (string, []error, error) {
-	if bundle.messages[key] == nil {
+	message := bundle.messages[key]
+	if message == nil {
 		return "", nil, fmt.Errorf("message '%s' does not exist", key)
 	}
+	if message.Value == nil {
+		return "", nil, fmt.Errorf("message '%s' has no value", key)
+	}
+	formatted, errs := bundle.formatPattern(message.Value, contexts...)
+	return formatted, errs, nil
+}
 
-	msg := bundle.messages[key]
+// FormatMessageAttribute formats the given attribute of the message with the given key.
+// It behaves exactly like FormatMessage otherwise, and returns an error if either the message
+// or the attribute does not exist.
+func (bundle *Bundle) FormatMessageAttribute(key string, attribute string, contexts ...*FormatContext) (string, []error, error) {
+	message := bundle.messages[key]
+	if message == nil {
+		return "", nil, fmt.Errorf("message '%s' does not exist", key)
+	}
+	attr := findAttribute(message.Attributes, attribute)
+	if attr == nil {
+		return "", nil, fmt.Errorf("message '%s' has no attribute '%s'", key, attribute)
+	}
+	formatted, errs := bundle.formatPattern(attr.Value, contexts...)
+	return formatted, errs, nil
+}
+
+// formatPattern resolves a pattern against a fresh resolver holding the given contexts.
+func (bundle *Bundle) formatPattern(pattern *ast.Pattern, contexts ...*FormatContext) (string, []error) {
 	variables, functions := assembleContexts(contexts...)
 	res := &resolver{
 		bundle:    bundle,
@@ -208,11 +233,27 @@ func (bundle *Bundle) FormatMessage(key string, contexts ...*FormatContext) (str
 		functions: functions,
 		errors:    []error{},
 	}
-	result := res.resolvePattern(msg.Value).String()
-	return result, res.errors, nil
+	return res.resolvePattern(pattern).String(), res.errors
 }
 
-// Checks whether the bundle contains a message with the given key.
+// HasMessage checks whether the bundle contains a message with the given key.
 func (bundle *Bundle) HasMessage(key string) bool {
-    return bundle.messages[key] != nil
+	return bundle.messages[key] != nil
+}
+
+// HasMessageAttribute checks whether the bundle contains a message with the given key
+// that declares the given attribute.
+func (bundle *Bundle) HasMessageAttribute(key string, attribute string) bool {
+	message := bundle.messages[key]
+	return message != nil && findAttribute(message.Attributes, attribute) != nil
+}
+
+// findAttribute returns the attribute with the given name, or nil if there is none.
+func findAttribute(attributes []*ast.Attribute, name string) *ast.Attribute {
+	for _, attribute := range attributes {
+		if attribute.ID.Name == name {
+			return attribute
+		}
+	}
+	return nil
 }

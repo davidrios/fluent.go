@@ -76,13 +76,7 @@ func (resolver *resolver) resolveMessageReference(ref *ast.MessageReference) Val
 	}
 
 	if ref.Attribute != nil {
-		var attribute *ast.Attribute
-		for _, attr := range message.Attributes {
-			if attr.ID.Name == ref.Attribute.Name {
-				attribute = attr
-				break
-			}
-		}
+		attribute := findAttribute(message.Attributes, ref.Attribute.Name)
 		if attribute == nil {
 			resolver.errors = append(resolver.errors, fmt.Errorf("unknown message attribute '%s.%s'", ref.ID.Name, ref.Attribute.Name))
 			return &NoValue{

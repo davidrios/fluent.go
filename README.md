@@ -103,6 +103,31 @@ fmt.Println(message)
 // -> Hello, world!
 ```
 
+### Message attributes
+
+A message may declare attributes beside — or instead of — a value of its own,
+which is how one id can carry several related strings:
+
+```ftl
+login-code =
+    .subject = Your code
+    .body = Your code is { $code }.
+```
+
+`FormatMessage` formats a message's own value and reports an error for a message
+like the one above, which has none. Use `FormatMessageAttribute` to format one of
+its attributes:
+
+```go
+subject, errs, fatalErr := bundle.FormatMessageAttribute("login-code", "subject")
+
+body, errs, fatalErr := bundle.FormatMessageAttribute("login-code", "body",
+	fluent.WithVariable("code", "123456"))
+```
+
+`HasMessage` and `HasMessageAttribute` answer whether a bundle holds either,
+without formatting it.
+
 ### Further information
 
 For further information about how to use the API head over to the

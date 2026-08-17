@@ -5,6 +5,7 @@ import (
 	"github.com/lus/fluent.go/fluent/parser/ast"
 	"golang.org/x/text/language"
 	"strings"
+	"time"
 )
 
 // Bundle represents a collection of messages and terms collected from one or many resources.
@@ -104,6 +105,12 @@ func resolveValue(value interface{}) Value {
 	if strVal, ok := value.(string); ok {
 		return String(strVal)
 	}
+	if timeVal, ok := value.(time.Time); ok {
+		return DateTime(timeVal)
+	}
+	if timeVal, ok := value.(*DateTimeValue); ok {
+		return timeVal
+	}
 	if strVal, ok := value.(*StringValue); ok {
 		return strVal
 	}
@@ -169,7 +176,7 @@ func WithFunctions(functions map[string]Function) *FormatContext {
 	}
 }
 
-// TODO: Builtin functions (NUMBER, DATETIME)
+// TODO: Builtin NUMBER; DATETIME is in datetime.go
 func assembleContexts(options ...*FormatContext) (map[string]Value, map[string]Function) {
 	variables := make(map[string]Value)
 	functions := make(map[string]Function)

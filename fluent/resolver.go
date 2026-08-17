@@ -168,9 +168,23 @@ func (resolver *resolver) resolveVariableReference(ref *ast.VariableReference) V
 	return variable
 }
 
+// builtins are the functions every bundle has without being given them.
+//
+// They take the resolver, which a user-supplied Function cannot: a Function
+// returns only a Value, so it has nowhere to report that it was handed something
+// it could not use. A builtin needs that -- "unknown timeZone" has to reach the
+// caller rather than being swallowed into the formatted string.
+//
+// A function passed in through WithFunction wins, so a catalog that needs real
+// locale-aware dates can supply its own DATETIME and this one gets out of the way.
+var builtins = map[string]func(*resolver, []Value, map[string]Value) Value{
+	"DATETIME": dateTimeFunction,
+}
+
 func (resolver *resolver) resolveFunctionReference(ref *ast.FunctionReference) Value {
 	function := resolver.functions[ref.ID.Name]
-	if function == nil {
+	builtin := builtins[ref.ID.Name]
+	if function == nil && builtin == nil {
 		resolver.errors = append(resolver.errors, fmt.Errorf("unknown function '%s'", ref.ID.Name))
 		return &NoValue{
 			value: ref.ID.Name,
@@ -178,7 +192,10 @@ func (resolver *resolver) resolveFunctionReference(ref *ast.FunctionReference) V
 	}
 
 	positional, named := resolver.assembleArguments(ref.Arguments)
-	return function(positional, named)
+	if function != nil {
+		return function(positional, named)
+	}
+	return builtin(resolver, positional, named)
 }
 
 func (resolver *resolver) resolveSelectExpression(ref *ast.SelectExpression) Value {

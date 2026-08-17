@@ -128,6 +128,52 @@ body, errs, fatalErr := bundle.FormatMessageAttribute("login-code", "body",
 `HasMessage` and `HasMessageAttribute` answer whether a bundle holds either,
 without formatting it.
 
+### Dates
+
+`DATETIME` is available to every bundle without being registered, and formats a
+`time.Time` (or an RFC 3339 string, which is what a timestamp that has been
+through JSON looks like):
+
+```ftl
+suspended = Your account is suspended until { DATETIME($until, dateStyle: "short", timeStyle: "short", timeZoneName: "short") }.
+```
+
+```go
+message, errs, fatalErr := bundle.FormatMessage("suspended",
+	fluent.WithVariable("until", time.Now().Add(72*time.Hour)))
+```
+
+**It formats in a locale-neutral way, and that is deliberate.** Fluent models
+`DATETIME` on ECMA-402's `Intl.DateTimeFormat`, whose whole subject is writing a
+date the way a given locale writes one. Go ships no CLDR date data, so this
+implementation cannot do that — and writing "September" for every locale would be
+worse than not offering it, because it would look localized. So the output is
+ISO 8601 order and numeric throughout, which every locale can read:
+
+| Options | Output |
+| --- | --- |
+| *(none)* | `2026-09-01 12:30 UTC` |
+| `dateStyle: "short"` | `2026-09-01` |
+| `timeStyle: "short"` | `12:30` |
+| `timeStyle: "long"` | `12:30:45 UTC` |
+| `timeZone: "America/Sao_Paulo", timeStyle: "short"` | `09:30` |
+
+The options are named as ECMA-402 names them, so a catalog written against a
+fuller implementation keeps working. `dateStyle` and `timeStyle` take
+`full`/`long`/`medium`/`short`; the component options (`year`, `month`, `day`,
+`hour`, `minute`, `second`) take `numeric` and `2-digit`. Anything that can only
+mean "write a name" — `month: "long"` and friends — records an error and falls
+back to digits rather than inventing English.
+
+**The default time zone is UTC**, not the machine's: a formatted date with no
+zone in it means something different to every reader, and a server rarely knows
+which zone its reader is in. `timeZone` takes an IANA name, resolved through
+`time.LoadLocation`, so anything but `UTC` needs tzdata present (import
+`time/tzdata` to embed it).
+
+If you do have locale-aware formatting available, pass your own `DATETIME`
+through `fluent.WithFunction` and it takes precedence over this one.
+
 ### Further information
 
 For further information about how to use the API head over to the

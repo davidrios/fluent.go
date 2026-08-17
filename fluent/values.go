@@ -2,8 +2,6 @@ package fluent
 
 import "strconv"
 
-// TODO: Implement DateTimes
-
 // Function represents a function that builds a Value based on parameters
 type Function func(positional []Value, named map[string]Value) Value
 
